@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>SCR Netz-Manager</title>
+<style>
+  :root{
+    --bg:#0b1420;
+    --panel:#101d2c;
+    --panel2:#152438;
+    --line:#233247;
+    --text:#eaf1f8;
+    --dim:#7d93a8;
+    --gold:#f2b632;
+    --red:#e2273f;
+    --blue:#1a9fe0;
+    --orange:#e07b1a;
+    --pink:#e6197e;
+    --grey:#8fa3b3;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+    font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;overflow:hidden;}
+  #app{display:flex;flex-direction:column;height:100vh;}
+
+  header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 22px;background:linear-gradient(180deg,var(--panel),var(--bg));
+    border-bottom:1px solid var(--line);flex:0 0 auto;flex-wrap:wrap;gap:10px;
+  }
+  .brand{display:flex;align-items:center;gap:10px;}
+  .brand .mark{width:30px;height:30px;border-radius:8px;
+    background:conic-gradient(from 180deg,var(--red),var(--orange),var(--gold),var(--pink),var(--blue),var(--grey),var(--red));}
+  .brand h1{font-size:17px;margin:0;font-weight:700;letter-spacing:.2px;}
+  .brand span{display:block;font-size:11px;color:var(--dim);margin-top:1px;}
+
+  .stats{display:flex;gap:20px;align-items:center;}
+  .stat{text-align:right;}
+  .stat .n{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .stat .l{font-size:10.5px;color:var(--dim);}
+  .coin{color:var(--gold);}
+
+  main{flex:1;position:relative;overflow:hidden;}
+  svg{width:100%;height:100%;display:block;cursor:grab;}
+  svg:active{cursor:grabbing;}
+
+  .edge{stroke-linecap:round;fill:none;}
+  .edge-locked{stroke:#1b2735;stroke-width:5;}
+  .edge-open{stroke-width:5;}
+  .edge-noop{stroke:#3a4a5c;stroke-width:5;stroke-dasharray:2 7;opacity:.75;}
+
+  .stationdot{cursor:pointer;}
+  .stationdot .ring{fill:var(--bg);stroke-width:3.5;}
+  .stationdot .core{fill:var(--bg);}
+  .stationdot text{fill:var(--text);font-size:12.5px;font-weight:600;pointer-events:none;}
+  .stationdot.locked .ring{stroke:#2a3a4d;}
+  .stationdot.locked text{fill:#4b5f74;}
+  .stationdot.frontier .ring{stroke:var(--gold);animation:pulse 1.4s ease-in-out infinite;}
+  .stationdot.frontier text{fill:var(--gold);}
+  .badge{fill:var(--gold);}
+  .badge text{fill:#1a1400;font-size:10px;font-weight:800;pointer-events:none;}
+
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+
+  .train{filter:drop-shadow(0 0 3px rgba(0,0,0,.6));}
+
+  #tooltip{
+    position:absolute;pointer-events:none;background:var(--panel2);
+    border:1px solid var(--line);border-radius:8px;padding:8px 11px;font-size:12.5px;
+    display:none;z-index:20;box-shadow:0 6px 18px rgba(0,0,0,.4);max-width:230px;
+  }
+  #tooltip b{display:block;margin-bottom:2px;font-size:13.5px;}
+  #tooltip .cost{color:var(--gold);font-weight:700;}
+  #tooltip .free{color:#5fd685;font-weight:700;}
+
+  #toast{
+    position:absolute;left:50%;bottom:16px;transform:translateX(-50%);
+    background:var(--panel2);border:1px solid var(--line);border-radius:9px;
+    padding:10px 18px;font-size:13px;opacity:0;transition:opacity .25s,transform .25s;
+    pointer-events:none;z-index:30;
+  }
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(-4px);}
+
+  .hint{position:absolute;top:14px;right:14px;background:var(--panel2);
+    border:1px solid var(--line);border-radius:10px;padding:9px 14px;font-size:12px;
+    color:var(--dim);max-width:240px;z-index:15;}
+
+  .zoomctl{position:absolute;bottom:16px;right:16px;display:flex;flex-direction:column;
+    gap:6px;z-index:15;}
+  .zoomctl button{width:34px;height:34px;border-radius:8px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--text);font-size:17px;cursor:pointer;}
+  .zoomctl button:hover{background:var(--line);}
+
+  /* Depot / Betreiber panel */
+  #depot{position:absolute;top:14px;left:14px;width:238px;background:var(--panel2);
+    border:1px solid var(--line);border-radius:12px;padding:12px;z-index:15;
+    box-shadow:0 10px 24px rgba(0,0,0,.35);}
+  #depot h2{margin:0 0 8px;font-size:12.5px;letter-spacing:.3px;color:var(--dim);font-weight:700;}
+  .op-row{display:flex;align-items:center;gap:9px;padding:7px 4px;border-radius:8px;}
+  .op-row+.op-row{border-top:1px solid #1c2c3f;}
+  .op-sw{width:12px;height:12px;border-radius:3px;flex:0 0 auto;}
+  .op-info{flex:1;min-width:0;}
+  .op-name{font-size:12.5px;font-weight:700;}
+  .op-sub{font-size:10.5px;color:var(--dim);}
+  .op-btn{flex:0 0 auto;border:none;border-radius:7px;padding:6px 9px;font-size:11px;
+    font-weight:700;cursor:pointer;color:#1a1400;background:var(--gold);white-space:nowrap;}
+  .op-btn.locked{background:#233247;color:var(--dim);}
+  .op-btn.free{background:#5fd685;}
+  .op-btn:disabled{opacity:.45;cursor:default;}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand">
+      <div class="mark"></div>
+      <div>
+        <h1>SCR Netz-Manager</h1>
+        <span>Stepford County Railway &mdash; Streckenausbau-Simulation</span>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="n coin" id="coinN">0</div><div class="l">M&uuml;nzen</div></div>
+      <div class="stat"><div class="n" id="stationN">1</div><div class="l">Stationen frei</div></div>
+      <div class="stat"><div class="n" id="trainN">0</div><div class="l">Z&uuml;ge im Einsatz</div></div>
+      <div class="stat"><div class="n" id="depotN">0</div><div class="l">Z&uuml;ge im Depot</div></div>
+    </div>
+  </header>
+  <main>
+    <svg id="map" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid meet"></svg>
+    <div id="tooltip"></div>
+    <div id="toast"></div>
+    <div id="depot"><h2>Betreiber &amp; Fuhrpark</h2><div id="opList"></div></div>
+    <div class="hint">Gleise werden durch Stationen freigeschaltet. Damit Z&uuml;ge dort fahren, brauchst du au&szlig;erdem den passenden Betreiber und einen Zug im Depot &mdash; der erste Connect-Zug ist gratis, alles Weitere kostet.</div>
+    <div class="zoomctl">
+      <button id="zin">+</button>
+      <button id="zout">&minus;</button>
+      <button id="zreset">&#8634;</button>
+    </div>
+  </main>
+</div>
+
+<script>
+/* ---------- Streckennetz (angelehnt an die SCR-Karte) ---------- */
+const COLORS = { red:'#e2273f', blue:'#1a9fe0', orange:'#e07b1a', pink:'#e6197e', grey:'#8fa3b3' };
+
+const S = {}; // stations id -> {name,x,y}
+function st(id,name,x,y){ S[id]={id,name,x,y}; return id; }
+
+st('stepford_victoria','Stepford Victoria',269,728);
+st('financial_quarter','Financial Quarter',216,678);
+st('stepford_bay','Stepford Bay',52,595);
+st('cadoxton','Cadoxton',119,595);
+st('willowfield','Willowfield',91,420);
+st('hemdon_park','Hemdon Park',130,455);
+st('beechley','Beechley / City Hospital',161,501);
+st('stepford_central','Stepford Central',299,581);
+st('four_ways','Four Ways',365,581);
+st('stepford_east','Stepford East',432,581);
+st('high_street','High Street',497,581);
+st('st_helens_bridge','St. Helens Bridge',572,581);
+st('new_harrow','New Harrow',671,581);
+st('elsemere_junction','Elsemere Junction',787,581);
+st('berrily','Berrily',868,581);
+st('east_berrily','East Berrily',982,581);
+st('beaulieu_park','Beaulieu Park',1096,581);
+st('morganstown','Morganstown',1266,581);
+st('hampton_hargate','Hampton Hargate',1345,610);
+st('whitefield','Whitefield',398,293);
+st('houghton_rake','Houghton Rake',427,347);
+st('woodhead_lane','Woodhead Lane',457,401);
+st('stepford_ufc','Stepford UFC',467,455);
+st('whitefield_lido','Whitefield Lido',497,509);
+st('coxly','Coxly',663,393);
+st('bodin','Bodin',632,447);
+st('angel_pass','Angel Pass',605,492);
+st('elsemere_pond','Elsemere Pond',730,542);
+st('coxly_newtown','Coxly Newtown',804,431);
+st('barton','Barton',838,500);
+st('denton_road','Denton Road',876,523);
+st('greenslade','Greenslade',912,538);
+st('whitney_green','Whitney Green',1105,538);
+st('port_benton','Port Benton',1036,415);
+st('morganstown_docks','Morganstown Docks',1026,449);
+st('robinson_way','Robinson Way',1040,476);
+st('benton','Benton',940,300);
+st('benton_bridge','Benton Bridge',1176,340);
+st('west_benton','West Benton',850,262);
+st('faraday_road','Faraday Road',822,208);
+st('eden_quay','Eden Quay',780,155);
+st('newry','Newry',734,101);
+st('newry_harbour','Newry Harbour',700,50);
+st('connolly','Connolly',1110,155);
+st('ashlan_park','Ashlan Park',1070,208);
+st('cambridge_st_parkway','Cambridge St. Parkway',1031,246);
+st('airport_west','Airport West',1207,219);
+st('airport_central','Airport Central',1259,184);
+st('terminal_1','Terminal 1',1290,120);
+st('terminal_3','Terminal 3',1330,48);
+st('terminal_2','Terminal 2',1513,33);
+st('airport_parkway','Airport Parkway',1319,299);
+st('james_street','James Street',1370,287);
+st('farleigh','Farleigh',1460,356);
+st('rosedale_village','Rosedale Village',1500,416);
+st('esterfield','Esterfield',1410,526);
+st('water_newton','Water Newton',1527,754);
+st('rocket_parade','Rocket Parade',1524,847);
+st('upper_staploe','Upper Staploe',1360,710);
+st('leighton_west','Leighton West',1272,743);
+st('leighton_stepford_road','Leighton Stepford Road',1345,797);
+st('leighton_city','Leighton City',1266,855);
+st('aslockby','Aslockby',1157,791);
+st('rayleigh_bay','Rayleigh Bay',954,762);
+st('carnalea_bridge','Carnalea Bridge',1032,747);
+st('llyn','Llyn-by-the-Sea',403,845);
+st('starryloch','Starryloch',482,845);
+st('millcastle','Millcastle',639,845);
+st('westwyvern','Westwyvern',639,808);
+st('millcastle_racecourse','Millcastle Racecourse',797,795);
+st('westercoast','Westercoast',874,845);
+st('faymere','Faymere',954,795);
+st('edgemead','Edgemead',1031,845);
+
+const LINES = [
+  { color:'red', path:['stepford_bay','cadoxton','financial_quarter','stepford_victoria'] },
+  { color:'red', path:['willowfield','hemdon_park','beechley','stepford_central','four_ways','stepford_east','high_street','st_helens_bridge','new_harrow','elsemere_junction','coxly_newtown','barton','denton_road','greenslade','whitney_green','east_berrily','beaulieu_park','morganstown','benton_bridge'] },
+  { color:'blue', path:['whitefield','houghton_rake','woodhead_lane','stepford_ufc','whitefield_lido','high_street'] },
+  { color:'blue', path:['stepford_victoria','financial_quarter','cadoxton','beechley','stepford_central','four_ways','stepford_east','high_street','st_helens_bridge','new_harrow','elsemere_junction','berrily','east_berrily','beaulieu_park','morganstown','airport_parkway','james_street','farleigh','rosedale_village'] },
+  { color:'blue', path:['leighton_west','carnalea_bridge','rayleigh_bay'] },
+  { color:'blue', path:['carnalea_bridge','aslockby','leighton_city','westercoast','faymere','edgemead','millcastle','starryloch','llyn'] },
+  { color:'orange', path:['stepford_central','four_ways','stepford_east','high_street','st_helens_bridge','new_harrow','elsemere_junction','berrily','east_berrily','beaulieu_park','morganstown','esterfield','water_newton','rocket_parade'] },
+  { color:'orange', path:['morganstown','benton_bridge','airport_west','airport_central','terminal_3'] },
+  { color:'orange', path:['airport_central','terminal_1'] },
+  { color:'pink', path:['newry_harbour','newry','eden_quay','faraday_road','west_benton','coxly','elsemere_pond','angel_pass','bodin','coxly_newtown','port_benton','morganstown_docks','robinson_way','benton_bridge'] },
+  { color:'pink', path:['benton_bridge','morganstown','hampton_hargate','upper_staploe','leighton_stepford_road','leighton_city'] },
+  { color:'pink', path:['llyn','starryloch','westwyvern','millcastle_racecourse','faymere','edgemead','aslockby'] },
+  { color:'grey', path:['newry_harbour','benton','west_benton'] },
+  { color:'grey', path:['benton','coxly','elsemere_pond','elsemere_junction'] },
+  { color:'grey', path:['benton','cambridge_st_parkway','ashlan_park','connolly'] },
+  { color:'grey', path:['benton','benton_bridge','airport_west','airport_central','terminal_2'] },
+  { color:'grey', path:['airport_parkway','james_street','farleigh','rosedale_village','esterfield'] }
+];
+
+/* Kanten aus den Linien ableiten (mit Farbe) */
+const edgeMap = new Map();
+function edgeKey(a,b){ return a<b ? a+'|'+b : b+'|'+a; }
+LINES.forEach(line=>{
+  for(let i=0;i<line.path.length-1;i++){
+    const a=line.path[i], b=line.path[i+1];
+    const k = edgeKey(a,b);
+    if(!edgeMap.has(k)) edgeMap.set(k,{a,b,colors:new Set()});
+    edgeMap.get(k).colors.add(line.color);
+  }
+});
+const EDGES = [...edgeMap.values()];
+
+const ADJ = {};
+Object.keys(S).forEach(id=>ADJ[id]=[]);
+EDGES.forEach(e=>{ ADJ[e.a].push(e.b); ADJ[e.b].push(e.a); });
+
+/* ---------- Betreiber ---------- */
+const OPERATORS = [
+  { id:'connect',  color:'blue',   name:'Connect',    unlockCost:0,   unlocked:true,  trainsOwned:0, trainBase:24, trainStep:14 },
+  { id:'overground', color:'red', name:'Overground',  unlockCost:70,  unlocked:false, trainsOwned:0, trainBase:26, trainStep:15 },
+  { id:'airlink',  color:'orange',name:'Airlink',      unlockCost:110, unlocked:false, trainsOwned:0, trainBase:30, trainStep:17 },
+  { id:'metro',    color:'pink',  name:'Metro',        unlockCost:90,  unlocked:false, trainsOwned:0, trainBase:28, trainStep:16 },
+  { id:'underground', color:'grey', name:'Underground',unlockCost:130, unlocked:false, trainsOwned:0, trainBase:32, trainStep:18 }
+];
+function opById(id){ return OPERATORS.find(o=>o.id===id); }
+
+function trainCost(op){
+  if(op.id==='connect' && op.trainsOwned===0) return 0; // erster Connect-Zug gratis
+  return Math.round(op.trainBase + op.trainsOwned*op.trainStep);
+}
+
+/* ---------- Stations-Fortschritt ---------- */
+const START = 'stepford_victoria';
+let unlocked = new Set([START]);
+let coins = 40;
+let stationFreeUsed = false;
+
+function frontierSet(){
+  const f = new Set();
+  unlocked.forEach(id=>{ ADJ[id].forEach(n=>{ if(!unlocked.has(n)) f.add(n); }); });
+  return f;
+}
+function stationCost(id){
+  const base = 24 + unlocked.size * 9;
+  const branchBonus = (ADJ[id].length>=3) ? 14 : 0;
+  return Math.round(base + branchBonus);
+}
+
+/* ---------- Rendering setup ---------- */
+const svg = document.getElementById('map');
+const NS = 'http://www.w3.org/2000/svg';
+function el(tag,attrs){ const e=document.createElementNS(NS,tag); for(const k in attrs) e.setAttribute(k,attrs[k]); return e; }
+
+const gEdgesLocked = el('g',{});
+const gEdgesOpen = el('g',{});
+const gTrains = el('g',{});
+const gStations = el('g',{});
+svg.appendChild(gEdgesLocked);
+svg.appendChild(gEdgesOpen);
+svg.appendChild(gTrains);
+svg.appendChild(gStations);
+
+let view = {x:0,y:0,scale:1};
+function applyView(){
+  [gEdgesLocked,gEdgesOpen,gTrains,gStations].forEach(g=>g.setAttribute('transform',`translate(${view.x},${view.y}) scale(${view.scale})`));
+}
+let dragging=false, dragStart=null;
+svg.addEventListener('pointerdown',e=>{ dragging=true; dragStart={x:e.clientX-view.x,y:e.clientY-view.y}; });
+window.addEventListener('pointerup',()=>dragging=false);
+window.addEventListener('pointermove',e=>{ if(dragging){ view.x=e.clientX-dragStart.x; view.y=e.clientY-dragStart.y; applyView(); }});
+svg.addEventListener('wheel',e=>{ e.preventDefault(); const d = e.deltaY>0?0.9:1.1; view.scale=Math.min(2.6,Math.max(0.5,view.scale*d)); applyView(); },{passive:false});
+document.getElementById('zin').onclick=()=>{view.scale=Math.min(2.6,view.scale*1.15);applyView();};
+document.getElementById('zout').onclick=()=>{view.scale=Math.max(0.5,view.scale*0.87);applyView();};
+document.getElementById('zreset').onclick=()=>{view={x:0,y:0,scale:1};applyView();};
+
+/* ---------- Gleise zeichnen ---------- */
+function drawEdges(){
+  gEdgesLocked.innerHTML=''; gEdgesOpen.innerHTML='';
+  EDGES.forEach(e=>{
+    const a=S[e.a], b=S[e.b];
+    const open = unlocked.has(e.a)&&unlocked.has(e.b);
+    if(!open){
+      gEdgesLocked.appendChild(el('line',{x1:a.x,y1:a.y,x2:b.x,y2:b.y,class:'edge edge-locked'}));
+      return;
+    }
+    const colors=[...e.colors];
+    colors.forEach((c,ci)=>{
+      const offset=(ci-(colors.length-1)/2)*6;
+      const dx=b.x-a.x, dy=b.y-a.y; const len=Math.hypot(dx,dy)||1;
+      const nx=-dy/len*offset, ny=dx/len*offset;
+      const op = OPERATORS.find(o=>o.color===c);
+      const line = el('line',{ x1:a.x+nx,y1:a.y+ny,x2:b.x+nx,y2:b.y+ny });
+      if(op && op.unlocked){
+        line.setAttribute('class','edge edge-open');
+        line.setAttribute('stroke',COLORS[c]);
+      } else {
+        line.setAttribute('class','edge edge-noop');
+      }
+      gEdgesOpen.appendChild(line);
+    });
+  });
+}
+
+/* ---------- Stationen zeichnen ---------- */
+function drawStations(){
+  gStations.innerHTML='';
+  const frontier = frontierSet();
+  Object.values(S).forEach(s=>{
+    const isUnlocked = unlocked.has(s.id);
+    const isFrontier = frontier.has(s.id);
+    const grp = el('g',{class:'stationdot '+(isUnlocked?'unlocked':(isFrontier?'frontier':'locked')),
+      transform:`translate(${s.x},${s.y})`});
+    const ring = el('circle',{class:'ring', r:8});
+    if(isUnlocked) ring.setAttribute('stroke', pickLineColor(s.id));
+    grp.appendChild(ring);
+    grp.appendChild(el('circle',{class:'core', r:3.4}));
+    const txt = el('text',{x:12,y:4}); txt.textContent = s.name; grp.appendChild(txt);
+    if(isFrontier){
+      const cost = stationCost(s.id);
+      const free = !stationFreeUsed;
+      const bx=-8, by=-22;
+      const badge = el('g',{class:'badge'});
+      const bw = free? 40: (String(cost).length*8+22);
+      badge.appendChild(el('rect',{x:bx,y:by,width:bw,height:16,rx:8}));
+      const bt = el('text',{x:bx+bw/2,y:by+11.5,'text-anchor':'middle'});
+      bt.textContent = free? 'GRATIS' : ('\u00a2'+cost);
+      badge.appendChild(bt);
+      grp.appendChild(badge);
+    }
+    grp.addEventListener('click',()=>onStationClick(s.id,isFrontier));
+    grp.addEventListener('mouseenter',(ev)=>showTip(ev,s,isUnlocked,isFrontier));
+    grp.addEventListener('mousemove',(ev)=>positionTip(ev));
+    grp.addEventListener('mouseleave',hideTip);
+    gStations.appendChild(grp);
+  });
+}
+function pickLineColor(id){
+  for(const line of LINES){ if(line.path.includes(id)) return COLORS[line.color]; }
+  return COLORS.grey;
+}
+
+const tooltip=document.getElementById('tooltip');
+function showTip(ev,s,isUnlocked,isFrontier){
+  let html = `<b>${s.name}</b>`;
+  if(isUnlocked) html+=`<span style="color:#5fd685">Gleis freigeschaltet</span>`;
+  else if(isFrontier){
+    const cost=stationCost(s.id);
+    html += !stationFreeUsed ? `<span class="free">Erste Station: gratis!</span>` : `Freischalten: <span class="cost">\u00a2${cost}</span>`;
+  } else {
+    html += `<span style="color:#7d93a8">Erst erreichbar, wenn eine Nachbarstation frei ist.</span>`;
+  }
+  tooltip.innerHTML = html; tooltip.style.display='block'; positionTip(ev);
+}
+function positionTip(ev){
+  const rect = svg.getBoundingClientRect();
+  tooltip.style.left = (ev.clientX-rect.left+14)+'px';
+  tooltip.style.top = (ev.clientY-rect.top+10)+'px';
+}
+function hideTip(){ tooltip.style.display='none'; }
+
+let toastTimer=null;
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),1900);
+}
+
+function onStationClick(id,isFrontier){
+  if(unlocked.has(id) || !isFrontier) return;
+  const cost = stationCost(id);
+  if(!stationFreeUsed){
+    stationFreeUsed = true;
+    unlocked.add(id);
+    toast(`${S[id].name} kostenlos freigeschaltet! Willkommen im Netz.`);
+  } else {
+    if(coins < cost){ toast(`Nicht genug M\u00fcnzen \u2014 ben\u00f6tigt \u00a2${cost}, du hast \u00a2${coins}.`); return; }
+    coins -= cost; unlocked.add(id);
+    toast(`${S[id].name} freigeschaltet f\u00fcr \u00a2${cost}.`);
+  }
+  assignReserveTrains();
+  drawEdges(); drawStations(); renderDepot(); updateHUD();
+}
+
+/* ---------- Betreiber & Z\u00fcge kaufen ---------- */
+let trains = []; // {operatorId,color,edgeIndex(null=Depot),t,dir,speed}
+
+function buyOperator(op){
+  if(op.unlocked) return;
+  if(coins < op.unlockCost){ toast(`Nicht genug M\u00fcnzen f\u00fcr ${op.name} \u2014 ben\u00f6tigt \u00a2${op.unlockCost}.`); return; }
+  coins -= op.unlockCost; op.unlocked = true;
+  toast(`${op.name} als Betreiber freigeschaltet! Jetzt kannst du Z\u00fcge f\u00fcr sie kaufen.`);
+  assignReserveTrains();
+  drawEdges(); renderDepot(); updateHUD();
+}
+
+function buyTrain(op){
+  if(!op.unlocked) return;
+  const cost = trainCost(op);
+  const free = (op.id==='connect' && op.trainsOwned===0);
+  if(!free && coins<cost){ toast(`Nicht genug M\u00fcnzen \u2014 ben\u00f6tigt \u00a2${cost}, du hast \u00a2${coins}.`); return; }
+  if(!free) coins -= cost;
+  op.trainsOwned++;
+  const tr = { operatorId:op.id, color:COLORS[op.color], edgeIndex:null, t:Math.random(), dir:Math.random()<0.5?1:-1, speed:0.09+Math.random()*0.05 };
+  trains.push(tr);
+  tryAssignTrain(tr);
+  toast(free ? `Erster ${op.name}-Zug gratis abgeholt! Er f\u00e4hrt los, sobald Gleise offen sind.`
+             : `Neuer ${op.name}-Zug f\u00fcr \u00a2${cost} gekauft.`);
+  renderDepot(); updateHUD();
+}
+
+function tryAssignTrain(tr){
+  const op = opById(tr.operatorId);
+  for(let i=0;i<EDGES.length;i++){
+    const e = EDGES[i];
+    const open = unlocked.has(e.a)&&unlocked.has(e.b);
+    if(!open || !e.colors.has(op.color)) continue;
+    const taken = trains.some(t=>t.edgeIndex===i);
+    if(!taken){ tr.edgeIndex=i; return true; }
+  }
+  return false;
+}
+function assignReserveTrains(){
+  trains.filter(t=>t.edgeIndex===null).forEach(tryAssignTrain);
+}
+
+/* ---------- Depot-Panel ---------- */
+function renderDepot(){
+  const list = document.getElementById('opList');
+  list.innerHTML='';
+  OPERATORS.forEach(op=>{
+    const row = document.createElement('div'); row.className='op-row';
+    const sw = document.createElement('div'); sw.className='op-sw'; sw.style.background=COLORS[op.color];
+    const info = document.createElement('div'); info.className='op-info';
+    const name = document.createElement('div'); name.className='op-name'; name.textContent=op.name;
+    const sub = document.createElement('div'); sub.className='op-sub';
+    sub.textContent = op.unlocked ? `${op.trainsOwned} Zug${op.trainsOwned===1?'':'e'} im Fuhrpark` : `Betreiber gesperrt`;
+    info.appendChild(name); info.appendChild(sub);
+    const btn = document.createElement('button'); btn.className='op-btn';
+    if(!op.unlocked){
+      btn.textContent = `Kaufen \u00a2${op.unlockCost}`;
+      btn.className += coins>=op.unlockCost ? ' locked' : ' locked';
+      btn.disabled = coins < op.unlockCost;
+      btn.onclick = ()=>buyOperator(op);
+    } else {
+      const cost = trainCost(op);
+      const free = (op.id==='connect' && op.trainsOwned===0);
+      btn.textContent = free ? 'Zug: GRATIS' : `+ Zug \u00a2${cost}`;
+      if(free) btn.className += ' free';
+      btn.disabled = !free && coins<cost;
+      btn.onclick = ()=>buyTrain(op);
+    }
+    row.appendChild(sw); row.appendChild(info); row.appendChild(btn);
+    list.appendChild(row);
+  });
+}
+
+/* ---------- Z\u00fcge animieren ---------- */
+function drawTrains(dt){
+  gTrains.innerHTML='';
+  trains.forEach(tr=>{
+    if(tr.edgeIndex===null) return; // wartet im Depot
+    tr.t += tr.dir*tr.speed*dt;
+    if(tr.t>=1){ tr.t=1; tr.dir=-1; earn(); }
+    if(tr.t<=0){ tr.t=0; tr.dir=1; earn(); }
+    const e = EDGES[tr.edgeIndex];
+    const a=S[e.a], b=S[e.b];
+    const x=a.x+(b.x-a.x)*tr.t, y=a.y+(b.y-a.y)*tr.t;
+    gTrains.appendChild(el('circle',{class:'train', cx:x, cy:y, r:5.5, fill:tr.color, stroke:'#0b1420','stroke-width':1.6}));
+  });
+}
+let earnAccum=0;
+function earn(){ coins += 2; updateHUD(); renderDepot(); }
+
+/* ---------- HUD ---------- */
+function updateHUD(){
+  document.getElementById('coinN').textContent = Math.floor(coins);
+  document.getElementById('stationN').textContent = unlocked.size;
+  document.getElementById('trainN').textContent = trains.filter(t=>t.edgeIndex!==null).length;
+  document.getElementById('depotN').textContent = trains.filter(t=>t.edgeIndex===null).length;
+}
+
+/* ---------- Game loop ---------- */
+let last = performance.now();
+function loop(now){
+  const dt = Math.min(0.05,(now-last)/1000); last=now;
+  drawTrains(dt);
+  requestAnimationFrame(loop);
+}
+
+/* ---------- Init ---------- */
+drawEdges();
+drawStations();
+renderDepot();
+updateHUD();
+applyView();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
