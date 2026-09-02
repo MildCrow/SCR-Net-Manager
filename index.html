@@ -327,6 +327,7 @@ const LINES = [
   { color:'pink', path:['benton_bridge','morganstown','hampton_hargate','upper_staploe','leighton_stepford_road','leighton_city'] },
   { color:'pink', path:['llyn','starryloch','westwyvern','millcastle_racecourse','faymere','edgemead','aslockby'] },
   { color:'grey', path:['newry_harbour','benton','west_benton'] },
+  { color:'grey', path:['cadoxton','beechley'] },
   { color:'grey', path:['benton','coxly','elsemere_pond','elsemere_junction'] },
   { color:'grey', path:['benton','cambridge_st_parkway','ashlan_park','connolly'] },
   { color:'grey', path:['benton','benton_bridge','airport_west','airport_central','terminal_2'] },
@@ -353,10 +354,10 @@ EDGES.forEach(e=>{ ADJ[e.a].push(e.b); ADJ[e.b].push(e.a); });
 /* ---------- Betreiber ---------- */
 const OPERATORS = [
   { id:'connect',  color:'blue',   name:'Connect',    unlockCost:0,   unlocked:true,  trainsOwned:0, trainBase:24, trainStep:14 },
-  { id:'metro', color:'red', name:'Metro',  unlockCost:70,  unlocked:false, trainsOwned:0, trainBase:26, trainStep:15 },
+  { id:'overground', color:'red', name:'Metro',  unlockCost:70,  unlocked:false, trainsOwned:0, trainBase:26, trainStep:15 },
   { id:'airlink',  color:'orange',name:'Airlink',      unlockCost:110, unlocked:false, trainsOwned:0, trainBase:30, trainStep:17 },
-  { id:'Express',    color:'pink',  name:'Express',        unlockCost:90,  unlocked:false, trainsOwned:0, trainBase:28, trainStep:16 },
-  { id:'underground', color:'grey', name:'Underground',unlockCost:130, unlocked:false, trainsOwned:0, trainBase:32, trainStep:18 }
+  { id:'metro',    color:'pink',  name:'Express',      unlockCost:90,  unlocked:false, trainsOwned:0, trainBase:28, trainStep:16 },
+  { id:'underground', color:'grey', name:'Waterline',      unlockCost:130, unlocked:false, trainsOwned:0, trainBase:32, trainStep:18 }
 ];
 function opById(id){ return OPERATORS.find(o=>o.id===id); }
 
