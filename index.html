@@ -261,10 +261,10 @@ EDGES.forEach(e=>{ ADJ[e.a].push(e.b); ADJ[e.b].push(e.a); });
 /* ---------- Betreiber ---------- */
 const OPERATORS = [
   { id:'connect',  color:'blue',   name:'Connect',    unlockCost:0,   unlocked:true,  trainsOwned:0, trainBase:24, trainStep:14 },
-  { id:'overground', color:'red', name:'Overground',  unlockCost:70,  unlocked:false, trainsOwned:0, trainBase:26, trainStep:15 },
+  { id:'metro', color:'red', name:'metro',  unlockCost:70,  unlocked:false, trainsOwned:0, trainBase:26, trainStep:15 },
   { id:'airlink',  color:'orange',name:'Airlink',      unlockCost:110, unlocked:false, trainsOwned:0, trainBase:30, trainStep:17 },
-  { id:'metro',    color:'pink',  name:'Metro',        unlockCost:90,  unlocked:false, trainsOwned:0, trainBase:28, trainStep:16 },
-  { id:'underground', color:'grey', name:'Underground',unlockCost:130, unlocked:false, trainsOwned:0, trainBase:32, trainStep:18 }
+  { id:'express',    color:'pink',  name:'Express',        unlockCost:90,  unlocked:false, trainsOwned:0, trainBase:28, trainStep:16 },
+  { id:'waterlne', color:'grey', name:'Waterline',unlockCost:130, unlocked:false, trainsOwned:0, trainBase:32, trainStep:18 }
 ];
 function opById(id){ return OPERATORS.find(o=>o.id===id); }
 
