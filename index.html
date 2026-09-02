@@ -34,11 +34,18 @@
   .brand h1{font-size:17px;margin:0;font-weight:700;letter-spacing:.2px;}
   .brand span{display:block;font-size:11px;color:var(--dim);margin-top:1px;}
 
+  .right-cluster{display:flex;align-items:center;gap:18px;}
   .stats{display:flex;gap:20px;align-items:center;}
   .stat{text-align:right;}
   .stat .n{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums;}
   .stat .l{font-size:10.5px;color:var(--dim);}
   .coin{color:var(--gold);}
+
+  .langsw{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  .langsw button{border:none;background:var(--panel2);color:var(--dim);font-size:12px;
+    font-weight:700;padding:7px 12px;cursor:pointer;}
+  .langsw button.active{background:var(--gold);color:#1a1400;}
+  .langsw button:not(.active):hover{background:var(--line);color:var(--text);}
 
   main{flex:1;position:relative;overflow:hidden;}
   svg{width:100%;height:100%;display:block;cursor:grab;}
@@ -115,23 +122,29 @@
     <div class="brand">
       <div class="mark"></div>
       <div>
-        <h1>SCR Netz-Manager</h1>
-        <span>Stepford County Railway &mdash; Streckenausbau-Simulation</span>
+        <h1 id="hTitle">SCR Netz-Manager</h1>
+        <span id="hSub">Stepford County Railway &mdash; Streckenausbau-Simulation</span>
       </div>
     </div>
-    <div class="stats">
-      <div class="stat"><div class="n coin" id="coinN">0</div><div class="l">M&uuml;nzen</div></div>
-      <div class="stat"><div class="n" id="stationN">1</div><div class="l">Stationen frei</div></div>
-      <div class="stat"><div class="n" id="trainN">0</div><div class="l">Z&uuml;ge im Einsatz</div></div>
-      <div class="stat"><div class="n" id="depotN">0</div><div class="l">Z&uuml;ge im Depot</div></div>
+    <div class="right-cluster">
+      <div class="stats">
+        <div class="stat"><div class="n coin" id="coinN">0</div><div class="l" id="lCoin">M&uuml;nzen</div></div>
+        <div class="stat"><div class="n" id="stationN">1</div><div class="l" id="lStations">Stationen frei</div></div>
+        <div class="stat"><div class="n" id="trainN">0</div><div class="l" id="lTrainsActive">Z&uuml;ge im Einsatz</div></div>
+        <div class="stat"><div class="n" id="depotN">0</div><div class="l" id="lTrainsDepot">Z&uuml;ge im Depot</div></div>
+      </div>
+      <div class="langsw" id="langsw">
+        <button data-lang="de">DE</button>
+        <button data-lang="en">EN</button>
+      </div>
     </div>
   </header>
   <main>
     <svg id="map" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid meet"></svg>
     <div id="tooltip"></div>
     <div id="toast"></div>
-    <div id="depot"><h2>Betreiber &amp; Fuhrpark</h2><div id="opList"></div></div>
-    <div class="hint">Gleise werden durch Stationen freigeschaltet. Damit Z&uuml;ge dort fahren, brauchst du au&szlig;erdem den passenden Betreiber und einen Zug im Depot &mdash; der erste Connect-Zug ist gratis, alles Weitere kostet.</div>
+    <div id="depot"><h2 id="depotHeading">Betreiber &amp; Fuhrpark</h2><div id="opList"></div></div>
+    <div class="hint" id="hintBox"></div>
     <div class="zoomctl">
       <button id="zin">+</button>
       <button id="zout">&minus;</button>
@@ -141,6 +154,85 @@
 </div>
 
 <script>
+/* ---------- Sprachen ---------- */
+const I18N = {
+  de: {
+    title:'SCR Netz-Manager',
+    sub:'Stepford County Railway \u2014 Streckenausbau-Simulation',
+    coins:'M\u00fcnzen', stations:'Stationen frei', trainsActive:'Z\u00fcge im Einsatz', trainsDepot:'Z\u00fcge im Depot',
+    depotHeading:'Betreiber &amp; Fuhrpark',
+    hint:'Gleise werden durch Stationen freigeschaltet. Damit Z\u00fcge dort fahren, brauchst du au\u00dferdem den passenden Betreiber und einen Zug im Depot \u2014 der erste Connect-Zug ist gratis, alles Weitere kostet.',
+    trackUnlocked:'Gleis freigeschaltet',
+    firstStationFree:'Erste Station: gratis!',
+    unlockStation:(cost)=>`Freischalten: <span class="cost">\u00a2${cost}</span>`,
+    lockedStationInfo:'Erst erreichbar, wenn eine Nachbarstation frei ist.',
+    free:'GRATIS',
+    stationFreeToast:(name)=>`${name} kostenlos freigeschaltet! Willkommen im Netz.`,
+    stationPaidToast:(name,cost)=>`${name} freigeschaltet f\u00fcr \u00a2${cost}.`,
+    notEnoughStation:(cost,coins)=>`Nicht genug M\u00fcnzen \u2014 ben\u00f6tigt \u00a2${cost}, du hast \u00a2${coins}.`,
+    notEnoughOperator:(name,cost)=>`Nicht genug M\u00fcnzen f\u00fcr ${name} \u2014 ben\u00f6tigt \u00a2${cost}.`,
+    operatorUnlockedToast:(name)=>`${name} als Betreiber freigeschaltet! Jetzt kannst du Z\u00fcge f\u00fcr sie kaufen.`,
+    notEnoughTrain:(cost,coins)=>`Nicht genug M\u00fcnzen \u2014 ben\u00f6tigt \u00a2${cost}, du hast \u00a2${coins}.`,
+    firstTrainToast:(name)=>`Erster ${name}-Zug gratis abgeholt! Er f\u00e4hrt los, sobald Gleise offen sind.`,
+    trainBoughtToast:(name,cost)=>`Neuer ${name}-Zug f\u00fcr \u00a2${cost} gekauft.`,
+    fleetCount:(n)=> n===1 ? `1 Zug im Fuhrpark` : `${n} Z\u00fcge im Fuhrpark`,
+    operatorLocked:'Betreiber gesperrt',
+    buyOperator:(cost)=>`Kaufen \u00a2${cost}`,
+    trainFreeBtn:'Zug: GRATIS',
+    trainBuyBtn:(cost)=>`+ Zug \u00a2${cost}`
+  },
+  en: {
+    title:'SCR Network Manager',
+    sub:'Stepford County Railway \u2014 Network Expansion Simulation',
+    coins:'Coins', stations:'Stations open', trainsActive:'Trains running', trainsDepot:'Trains in depot',
+    depotHeading:'Operators &amp; Fleet',
+    hint:'Unlocking stations opens the track. For trains to actually run there you also need the matching operator and a train in the depot \u2014 the first Connect train is free, everything after that costs money.',
+    trackUnlocked:'Track unlocked',
+    firstStationFree:'First station: free!',
+    unlockStation:(cost)=>`Unlock: <span class="cost">\u00a2${cost}</span>`,
+    lockedStationInfo:'Only reachable once a neighbouring station is open.',
+    free:'FREE',
+    stationFreeToast:(name)=>`${name} unlocked for free! Welcome to the network.`,
+    stationPaidToast:(name,cost)=>`${name} unlocked for \u00a2${cost}.`,
+    notEnoughStation:(cost,coins)=>`Not enough coins \u2014 needs \u00a2${cost}, you have \u00a2${coins}.`,
+    notEnoughOperator:(name,cost)=>`Not enough coins for ${name} \u2014 needs \u00a2${cost}.`,
+    operatorUnlockedToast:(name)=>`${name} unlocked as an operator! You can now buy trains for them.`,
+    notEnoughTrain:(cost,coins)=>`Not enough coins \u2014 needs \u00a2${cost}, you have \u00a2${coins}.`,
+    firstTrainToast:(name)=>`First ${name} train picked up for free! It'll depart once track is open.`,
+    trainBoughtToast:(name,cost)=>`New ${name} train bought for \u00a2${cost}.`,
+    fleetCount:(n)=> n===1 ? `1 train in fleet` : `${n} trains in fleet`,
+    operatorLocked:'Operator locked',
+    buyOperator:(cost)=>`Unlock \u00a2${cost}`,
+    trainFreeBtn:'Train: FREE',
+    trainBuyBtn:(cost)=>`+ Train \u00a2${cost}`
+  }
+};
+let lang = 'de';
+function t(){ return I18N[lang]; }
+function applyStaticText(){
+  document.getElementById('hTitle').textContent = t().title;
+  document.getElementById('hSub').textContent = t().sub;
+  document.getElementById('lCoin').textContent = t().coins;
+  document.getElementById('lStations').textContent = t().stations;
+  document.getElementById('lTrainsActive').textContent = t().trainsActive;
+  document.getElementById('lTrainsDepot').textContent = t().trainsDepot;
+  document.getElementById('depotHeading').innerHTML = t().depotHeading;
+  document.getElementById('hintBox').textContent = t().hint;
+  document.title = t().title;
+  document.querySelectorAll('#langsw button').forEach(b=>{
+    b.classList.toggle('active', b.dataset.lang===lang);
+  });
+}
+document.getElementById('langsw').addEventListener('click',(e)=>{
+  const btn = e.target.closest('button[data-lang]');
+  if(!btn) return;
+  lang = btn.dataset.lang;
+  applyStaticText();
+  drawStations();
+  renderDepot();
+  hideTip();
+});
+
 /* ---------- Streckennetz (angelehnt an die SCR-Karte) ---------- */
 const COLORS = { red:'#e2273f', blue:'#1a9fe0', orange:'#e07b1a', pink:'#e6197e', grey:'#8fa3b3' };
 
@@ -261,10 +353,10 @@ EDGES.forEach(e=>{ ADJ[e.a].push(e.b); ADJ[e.b].push(e.a); });
 /* ---------- Betreiber ---------- */
 const OPERATORS = [
   { id:'connect',  color:'blue',   name:'Connect',    unlockCost:0,   unlocked:true,  trainsOwned:0, trainBase:24, trainStep:14 },
-  { id:'metro', color:'red', name:'Metro',  unlockCost:70,  unlocked:false, trainsOwned:0, trainBase:26, trainStep:15 },
+  { id:'overground', color:'red', name:'Overground',  unlockCost:70,  unlocked:false, trainsOwned:0, trainBase:26, trainStep:15 },
   { id:'airlink',  color:'orange',name:'Airlink',      unlockCost:110, unlocked:false, trainsOwned:0, trainBase:30, trainStep:17 },
-  { id:'express',    color:'pink',  name:'Express',        unlockCost:90,  unlocked:false, trainsOwned:0, trainBase:28, trainStep:16 },
-  { id:'waterlne', color:'grey', name:'Waterline',unlockCost:130, unlocked:false, trainsOwned:0, trainBase:32, trainStep:18 }
+  { id:'metro',    color:'pink',  name:'Metro',        unlockCost:90,  unlocked:false, trainsOwned:0, trainBase:28, trainStep:16 },
+  { id:'underground', color:'grey', name:'Underground',unlockCost:130, unlocked:false, trainsOwned:0, trainBase:32, trainStep:18 }
 ];
 function opById(id){ return OPERATORS.find(o=>o.id===id); }
 
@@ -367,7 +459,7 @@ function drawStations(){
       const bw = free? 40: (String(cost).length*8+22);
       badge.appendChild(el('rect',{x:bx,y:by,width:bw,height:16,rx:8}));
       const bt = el('text',{x:bx+bw/2,y:by+11.5,'text-anchor':'middle'});
-      bt.textContent = free? 'GRATIS' : ('\u00a2'+cost);
+      bt.textContent = free? t().free : ('\u00a2'+cost);
       badge.appendChild(bt);
       grp.appendChild(badge);
     }
@@ -386,12 +478,12 @@ function pickLineColor(id){
 const tooltip=document.getElementById('tooltip');
 function showTip(ev,s,isUnlocked,isFrontier){
   let html = `<b>${s.name}</b>`;
-  if(isUnlocked) html+=`<span style="color:#5fd685">Gleis freigeschaltet</span>`;
+  if(isUnlocked) html+=`<span style="color:#5fd685">${t().trackUnlocked}</span>`;
   else if(isFrontier){
     const cost=stationCost(s.id);
-    html += !stationFreeUsed ? `<span class="free">Erste Station: gratis!</span>` : `Freischalten: <span class="cost">\u00a2${cost}</span>`;
+    html += !stationFreeUsed ? `<span class="free">${t().firstStationFree}</span>` : t().unlockStation(cost);
   } else {
-    html += `<span style="color:#7d93a8">Erst erreichbar, wenn eine Nachbarstation frei ist.</span>`;
+    html += `<span style="color:#7d93a8">${t().lockedStationInfo}</span>`;
   }
   tooltip.innerHTML = html; tooltip.style.display='block'; positionTip(ev);
 }
@@ -404,10 +496,10 @@ function hideTip(){ tooltip.style.display='none'; }
 
 let toastTimer=null;
 function toast(msg){
-  const t=document.getElementById('toast');
-  t.textContent=msg; t.classList.add('show');
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer=setTimeout(()=>t.classList.remove('show'),1900);
+  toastTimer=setTimeout(()=>el.classList.remove('show'),1900);
 }
 
 function onStationClick(id,isFrontier){
@@ -416,24 +508,27 @@ function onStationClick(id,isFrontier){
   if(!stationFreeUsed){
     stationFreeUsed = true;
     unlocked.add(id);
-    toast(`${S[id].name} kostenlos freigeschaltet! Willkommen im Netz.`);
+    toast(t().stationFreeToast(S[id].name));
   } else {
-    if(coins < cost){ toast(`Nicht genug M\u00fcnzen \u2014 ben\u00f6tigt \u00a2${cost}, du hast \u00a2${coins}.`); return; }
+    if(coins < cost){ toast(t().notEnoughStation(cost,coins)); return; }
     coins -= cost; unlocked.add(id);
-    toast(`${S[id].name} freigeschaltet f\u00fcr \u00a2${cost}.`);
+    toast(t().stationPaidToast(S[id].name,cost));
   }
   assignReserveTrains();
   drawEdges(); drawStations(); renderDepot(); updateHUD();
 }
 
 /* ---------- Betreiber & Z\u00fcge kaufen ---------- */
-let trains = []; // {operatorId,color,edgeIndex(null=Depot),t,dir,speed}
+// Ein Zug f\u00e4hrt entlang des gesamten freigeschalteten, zusammenh\u00e4ngenden
+// Abschnitts einer Linie (routeIndex = Index in LINES), nicht nur auf einer Kante.
+// pos ist ein Flie\u00dfkommaindex innerhalb von LINES[routeIndex].path.
+let trains = []; // {operatorId,color,routeIndex(null=Depot),pos,dir,speed}
 
 function buyOperator(op){
   if(op.unlocked) return;
-  if(coins < op.unlockCost){ toast(`Nicht genug M\u00fcnzen f\u00fcr ${op.name} \u2014 ben\u00f6tigt \u00a2${op.unlockCost}.`); return; }
+  if(coins < op.unlockCost){ toast(t().notEnoughOperator(op.name,op.unlockCost)); return; }
   coins -= op.unlockCost; op.unlocked = true;
-  toast(`${op.name} als Betreiber freigeschaltet! Jetzt kannst du Z\u00fcge f\u00fcr sie kaufen.`);
+  toast(t().operatorUnlockedToast(op.name));
   assignReserveTrains();
   drawEdges(); renderDepot(); updateHUD();
 }
@@ -442,30 +537,57 @@ function buyTrain(op){
   if(!op.unlocked) return;
   const cost = trainCost(op);
   const free = (op.id==='connect' && op.trainsOwned===0);
-  if(!free && coins<cost){ toast(`Nicht genug M\u00fcnzen \u2014 ben\u00f6tigt \u00a2${cost}, du hast \u00a2${coins}.`); return; }
+  if(!free && coins<cost){ toast(t().notEnoughTrain(cost,coins)); return; }
   if(!free) coins -= cost;
   op.trainsOwned++;
-  const tr = { operatorId:op.id, color:COLORS[op.color], edgeIndex:null, t:Math.random(), dir:Math.random()<0.5?1:-1, speed:0.09+Math.random()*0.05 };
+  const tr = { operatorId:op.id, color:COLORS[op.color], routeIndex:null, pos:0, dir:1, speed:0.55+Math.random()*0.25 };
   trains.push(tr);
   tryAssignTrain(tr);
-  toast(free ? `Erster ${op.name}-Zug gratis abgeholt! Er f\u00e4hrt los, sobald Gleise offen sind.`
-             : `Neuer ${op.name}-Zug f\u00fcr \u00a2${cost} gekauft.`);
+  toast(free ? t().firstTrainToast(op.name) : t().trainBoughtToast(op.name,cost));
   renderDepot(); updateHUD();
 }
 
+/* Findet auf einer Linie den l\u00e4ngsten zusammenh\u00e4ngenden freigeschalteten
+   Abschnitt (Start-/End-Index im path-Array). null, falls < 2 Stationen offen. */
+function longestOpenRun(route){
+  let bestLen=0,bestLo=0,bestHi=-1,curLo=null;
+  for(let i=0;i<route.path.length;i++){
+    if(unlocked.has(route.path[i])){
+      if(curLo===null) curLo=i;
+    } else if(curLo!==null){
+      const len=i-curLo; if(len>bestLen){bestLen=len;bestLo=curLo;bestHi=i-1;} curLo=null;
+    }
+  }
+  if(curLo!==null){ const len=route.path.length-curLo; if(len>bestLen){bestLen=len;bestLo=curLo;bestHi=route.path.length-1;} }
+  return bestHi>bestLo ? {lo:bestLo,hi:bestHi} : null;
+}
+/* Erweitert lo/hi um eine bestimmte Positon herum, solange die Nachbarstationen
+   im path-Array freigeschaltet sind (f\u00fcr laufende Z\u00fcge, deren Strecke gewachsen ist). */
+function runBoundsAround(route,idx){
+  let lo=idx, hi=idx;
+  while(lo-1>=0 && unlocked.has(route.path[lo-1])) lo--;
+  while(hi+1<route.path.length && unlocked.has(route.path[hi+1])) hi++;
+  return {lo,hi};
+}
 function tryAssignTrain(tr){
   const op = opById(tr.operatorId);
-  for(let i=0;i<EDGES.length;i++){
-    const e = EDGES[i];
-    const open = unlocked.has(e.a)&&unlocked.has(e.b);
-    if(!open || !e.colors.has(op.color)) continue;
-    const taken = trains.some(t=>t.edgeIndex===i);
-    if(!taken){ tr.edgeIndex=i; return true; }
-  }
-  return false;
+  let best=null;
+  LINES.forEach((route,ri)=>{
+    if(route.color!==op.color) return;
+    const run = longestOpenRun(route);
+    if(!run) return;
+    const busy = trains.filter(t2=>t2.routeIndex===ri).length;
+    const len = run.hi-run.lo;
+    if(!best || busy<best.busy || (busy===best.busy && len>best.len)){
+      best = {routeIndex:ri, lo:run.lo, hi:run.hi, busy, len};
+    }
+  });
+  if(!best) return false;
+  tr.routeIndex = best.routeIndex; tr.pos = best.lo; tr.dir = 1;
+  return true;
 }
 function assignReserveTrains(){
-  trains.filter(t=>t.edgeIndex===null).forEach(tryAssignTrain);
+  trains.filter(tt=>tt.routeIndex===null).forEach(tryAssignTrain);
 }
 
 /* ---------- Depot-Panel ---------- */
@@ -478,18 +600,18 @@ function renderDepot(){
     const info = document.createElement('div'); info.className='op-info';
     const name = document.createElement('div'); name.className='op-name'; name.textContent=op.name;
     const sub = document.createElement('div'); sub.className='op-sub';
-    sub.textContent = op.unlocked ? `${op.trainsOwned} Zug${op.trainsOwned===1?'':'e'} im Fuhrpark` : `Betreiber gesperrt`;
+    sub.textContent = op.unlocked ? t().fleetCount(op.trainsOwned) : t().operatorLocked;
     info.appendChild(name); info.appendChild(sub);
     const btn = document.createElement('button'); btn.className='op-btn';
     if(!op.unlocked){
-      btn.textContent = `Kaufen \u00a2${op.unlockCost}`;
-      btn.className += coins>=op.unlockCost ? ' locked' : ' locked';
+      btn.textContent = t().buyOperator(op.unlockCost);
+      btn.className += ' locked';
       btn.disabled = coins < op.unlockCost;
       btn.onclick = ()=>buyOperator(op);
     } else {
       const cost = trainCost(op);
       const free = (op.id==='connect' && op.trainsOwned===0);
-      btn.textContent = free ? 'Zug: GRATIS' : `+ Zug \u00a2${cost}`;
+      btn.textContent = free ? t().trainFreeBtn : t().trainBuyBtn(cost);
       if(free) btn.className += ' free';
       btn.disabled = !free && coins<cost;
       btn.onclick = ()=>buyTrain(op);
@@ -503,25 +625,33 @@ function renderDepot(){
 function drawTrains(dt){
   gTrains.innerHTML='';
   trains.forEach(tr=>{
-    if(tr.edgeIndex===null) return; // wartet im Depot
-    tr.t += tr.dir*tr.speed*dt;
-    if(tr.t>=1){ tr.t=1; tr.dir=-1; earn(); }
-    if(tr.t<=0){ tr.t=0; tr.dir=1; earn(); }
-    const e = EDGES[tr.edgeIndex];
-    const a=S[e.a], b=S[e.b];
-    const x=a.x+(b.x-a.x)*tr.t, y=a.y+(b.y-a.y)*tr.t;
+    if(tr.routeIndex===null) return; // wartet im Depot
+    const route = LINES[tr.routeIndex];
+    const centerIdx = Math.min(route.path.length-1, Math.max(0, Math.round(tr.pos)));
+    if(!unlocked.has(route.path[centerIdx])){ tryAssignTrain(tr); return; }
+    const {lo,hi} = runBoundsAround(route, centerIdx);
+    if(hi<=lo){
+      tr.pos = lo; // Strecke ist (noch) nur eine Station lang
+    } else {
+      tr.pos += tr.dir*tr.speed*dt;
+      if(tr.pos>=hi){ tr.pos=hi; tr.dir=-1; earn(); }
+      if(tr.pos<=lo){ tr.pos=lo; tr.dir=1; earn(); }
+    }
+    const i0=Math.floor(tr.pos), i1=Math.min(route.path.length-1,i0+1);
+    const frac=tr.pos-i0;
+    const p0=S[route.path[i0]], p1=S[route.path[i1]];
+    const x=p0.x+(p1.x-p0.x)*frac, y=p0.y+(p1.y-p0.y)*frac;
     gTrains.appendChild(el('circle',{class:'train', cx:x, cy:y, r:5.5, fill:tr.color, stroke:'#0b1420','stroke-width':1.6}));
   });
 }
-let earnAccum=0;
 function earn(){ coins += 2; updateHUD(); renderDepot(); }
 
 /* ---------- HUD ---------- */
 function updateHUD(){
   document.getElementById('coinN').textContent = Math.floor(coins);
   document.getElementById('stationN').textContent = unlocked.size;
-  document.getElementById('trainN').textContent = trains.filter(t=>t.edgeIndex!==null).length;
-  document.getElementById('depotN').textContent = trains.filter(t=>t.edgeIndex===null).length;
+  document.getElementById('trainN').textContent = trains.filter(tt=>tt.routeIndex!==null).length;
+  document.getElementById('depotN').textContent = trains.filter(tt=>tt.routeIndex===null).length;
 }
 
 /* ---------- Game loop ---------- */
@@ -533,6 +663,7 @@ function loop(now){
 }
 
 /* ---------- Init ---------- */
+applyStaticText();
 drawEdges();
 drawStations();
 renderDepot();
